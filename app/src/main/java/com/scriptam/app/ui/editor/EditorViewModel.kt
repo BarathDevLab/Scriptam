@@ -102,9 +102,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             result.fold(
-                onSuccess = { value ->
-                    if (value != null && value != Unit) {
-                        console.log("→ $value")
+                onSuccess = { res ->
+                    if (res.value != null && res.value != Unit) {
+                        console.log("→ ${res.value}")
+                    }
+                    if (res.widgetPayloadJson != null) {
+                        console.info("Widget UI defined.")
                     }
                     console.info("Script finished.")
                 },

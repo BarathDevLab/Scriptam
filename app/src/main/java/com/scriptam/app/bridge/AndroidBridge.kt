@@ -42,7 +42,7 @@ class AndroidBridge(
         deviceInfoModule.install(quickJs)
 
         // Wire everything under a `Native` namespace in JS
-        quickJs.evaluate<Unit>(
+        quickJs.evaluate<Any?>(
             """
             var Native = {
                 showToast:  __native_showToast,

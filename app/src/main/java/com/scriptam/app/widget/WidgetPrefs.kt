@@ -10,8 +10,10 @@ import android.content.Context
  *  - scriptId     : Long  — ID of the bound script
  *  - scriptTitle  : String
  *  - accentColor  : Int   — ARGB int
- *  - output       : String — last console output captured from the script
+ *  - output       : String — last console output or widgetUI JSON captured from the script
+ *  - isWidgetUI   : Boolean — true if output contains structured widgetUI JSON
  *  - lastRun      : Long  — epoch millis of last execution
+ *  - interval     : Long  — periodic update interval in minutes (default 0 = manual only)
  */
 object WidgetPrefs {
 
@@ -20,7 +22,9 @@ object WidgetPrefs {
     private const val KEY_SCRIPT_TITLE  = "widget_%d_script_title"
     private const val KEY_ACCENT_COLOR  = "widget_%d_accent_color"
     private const val KEY_OUTPUT        = "widget_%d_output"
+    private const val KEY_IS_WIDGET_UI  = "widget_%d_is_widget_ui"
     private const val KEY_LAST_RUN      = "widget_%d_last_run"
+    private const val KEY_INTERVAL      = "widget_%d_interval"
 
     // ---- Getters ----
 
@@ -36,8 +40,14 @@ object WidgetPrefs {
     fun getOutput(ctx: Context, id: Int): String =
         prefs(ctx).getString(key(KEY_OUTPUT, id), "") ?: ""
 
+    fun isWidgetUI(ctx: Context, id: Int): Boolean =
+        prefs(ctx).getBoolean(key(KEY_IS_WIDGET_UI, id), false)
+
     fun getLastRun(ctx: Context, id: Int): Long =
         prefs(ctx).getLong(key(KEY_LAST_RUN, id), 0L)
+
+    fun getIntervalMinutes(ctx: Context, id: Int): Long =
+        prefs(ctx).getLong(key(KEY_INTERVAL, id), 0L)
 
     // ---- Setters ----
 
@@ -55,10 +65,23 @@ object WidgetPrefs {
             .apply()
     }
 
-    fun saveOutput(ctx: Context, widgetId: Int, output: String, timestamp: Long) {
+    fun saveOutput(
+        ctx: Context,
+        widgetId: Int,
+        output: String,
+        timestamp: Long,
+        isWidgetUI: Boolean = false
+    ) {
         prefs(ctx).edit()
             .putString(key(KEY_OUTPUT, widgetId), output)
+            .putBoolean(key(KEY_IS_WIDGET_UI, widgetId), isWidgetUI)
             .putLong(key(KEY_LAST_RUN, widgetId), timestamp)
+            .apply()
+    }
+
+    fun saveIntervalMinutes(ctx: Context, widgetId: Int, minutes: Long) {
+        prefs(ctx).edit()
+            .putLong(key(KEY_INTERVAL, widgetId), minutes)
             .apply()
     }
 
@@ -68,7 +91,9 @@ object WidgetPrefs {
             .remove(key(KEY_SCRIPT_TITLE, widgetId))
             .remove(key(KEY_ACCENT_COLOR, widgetId))
             .remove(key(KEY_OUTPUT, widgetId))
+            .remove(key(KEY_IS_WIDGET_UI, widgetId))
             .remove(key(KEY_LAST_RUN, widgetId))
+            .remove(key(KEY_INTERVAL, widgetId))
             .apply()
     }
 

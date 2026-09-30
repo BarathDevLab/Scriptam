@@ -55,31 +55,53 @@ class ScriptWorker(
             networkModule = NetworkModule()
         )
 
+        val action = inputData.getString(KEY_ACTION)
+
         val result = engineManager.execute(
             script = code,
             console = console,
+            action = action,
             bridgeInstaller = { quickJs -> bridge.install(quickJs) }
         )
 
-        // Collect the console output as a single string for the widget
-        val outputText = console.entries.value.joinToString("\n") { entry ->
-            "${entry.level.name}: ${entry.message}"
+        val widgetJson = result.getOrNull()?.widgetPayloadJson
+        if (widgetJson != null) {
+            WidgetOutputUpdater.pushOutput(
+                context = applicationContext,
+                scriptId = scriptId,
+                output = widgetJson,
+                isWidgetUI = true
+            )
+        } else {
+            // Collect the console output as a single string for the widget
+            val outputText = console.entries.value.joinToString("\n") { entry ->
+                "${entry.level.name}: ${entry.message}"
+            }
+            WidgetOutputUpdater.pushOutput(
+                context = applicationContext,
+                scriptId = scriptId,
+                output = outputText,
+                isWidgetUI = false
+            )
         }
-
-        // Push output to any home-screen widgets bound to this script
-        WidgetOutputUpdater.pushOutput(applicationContext, scriptId, outputText)
 
         return if (result.isSuccess) Result.success() else Result.retry()
     }
 
     companion object {
         const val KEY_SCRIPT_ID = "script_id"
+        const val KEY_ACTION = "action"
         private const val TAG_PREFIX = "scriptam_script_"
 
         /** Schedule a one-time background execution of a script. */
-        fun enqueueOnce(context: Context, scriptId: Long) {
+        fun enqueueOnce(context: Context, scriptId: Long, action: String? = null) {
             val data = Data.Builder()
                 .putLong(KEY_SCRIPT_ID, scriptId)
+                .apply {
+                    if (action != null) {
+                        putString(KEY_ACTION, action)
+                    }
+                }
                 .build()
 
             val request = OneTimeWorkRequestBuilder<ScriptWorker>()

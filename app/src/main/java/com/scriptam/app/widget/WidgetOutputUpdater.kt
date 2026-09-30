@@ -5,10 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 
 /**
- * Utility to push captured console output into all widget instances
+ * Utility to push captured output or widgetUI JSON into all widget instances
  * that are bound to a given script.
- *
- * Called by [ScriptWorker] after a background execution completes.
  */
 object WidgetOutputUpdater {
 
@@ -16,7 +14,12 @@ object WidgetOutputUpdater {
      * Finds every home-screen widget bound to [scriptId] and updates it
      * with the given [output] text and current timestamp.
      */
-    fun pushOutput(context: Context, scriptId: Long, output: String) {
+    fun pushOutput(
+        context: Context,
+        scriptId: Long,
+        output: String,
+        isWidgetUI: Boolean = false
+    ) {
         val manager = AppWidgetManager.getInstance(context)
         val widgetIds = manager.getAppWidgetIds(
             ComponentName(context, ScriptWidget::class.java)
@@ -28,7 +31,8 @@ object WidgetOutputUpdater {
                     context = context,
                     widgetId = widgetId,
                     output = output,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    isWidgetUI = isWidgetUI
                 )
             }
         }
