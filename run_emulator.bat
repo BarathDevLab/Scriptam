@@ -1,0 +1,3 @@
+@echo off
+echo Starting Android Emulator (oee_dashboard_testing)...
+start "" "%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe" -avd oee_dashboard_testing

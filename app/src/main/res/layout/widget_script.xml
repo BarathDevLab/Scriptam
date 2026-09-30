@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Widget layout rendered via RemoteViews.
+    Only a limited subset of Views and attributes are supported by RemoteViews.
+    No Compose or data binding here.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Header row: accent dot + script title -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/widget_accent_dot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/widget_dot" />
+
+        <TextView
+            android:id="@+id/widget_script_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Script"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05" />
+
+        <!-- Run button -->
+        <ImageButton
+            android:id="@+id/widget_run_button"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/widget_run_bg"
+            android:contentDescription="Run"
+            android:src="@drawable/ic_widget_play"
+            android:scaleType="center"
+            android:padding="4dp" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"
+        android:background="#14FFFFFF" />
+
+    <!-- Output area -->
+    <TextView
+        android:id="@+id/widget_output"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFamily="monospace"
+        android:maxLines="6"
+        android:text="Tap ▶ to run"
+        android:textColor="#80FFFFFF"
+        android:textSize="11sp"
+        android:lineSpacingExtra="2dp" />
+
+    <!-- Footer: last-run timestamp -->
+    <TextView
+        android:id="@+id/widget_timestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="6dp"
+        android:text="–"
+        android:textColor="#40FFFFFF"
+        android:textSize="10sp" />
+
+</LinearLayout>

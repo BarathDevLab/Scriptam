@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="codemirror.min.css">
+    <link rel="stylesheet" href="material-darker.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            min-height: 100%;
+            width: 100%;
+            background: #0d0d14;
+            overflow: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .CodeMirror {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 100% !important;
+            width: 100% !important;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.65;
+            background: #0d0d14 !important;
+            color: #eff !important;
+        }
+
+        /* Gutter (line numbers) */
+        .CodeMirror-gutters {
+            background: #0d0d14 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+        .CodeMirror-linenumber {
+            color: rgba(255, 255, 255, 0.3) !important;
+            padding: 0 10px 0 6px !important;
+            font-size: 12px;
+        }
+
+        /* Active line */
+        .CodeMirror-activeline-background {
+            background: rgba(108, 99, 255, 0.08) !important;
+        }
+
+        /* Cursor */
+        .CodeMirror-cursor {
+            border-left: 2px solid #6C63FF !important;
+        }
+
+        /* Selection */
+        .CodeMirror-selected {
+            background: rgba(108, 99, 255, 0.25) !important;
+        }
+        .CodeMirror-focused .CodeMirror-selected {
+            background: rgba(108, 99, 255, 0.35) !important;
+        }
+
+        /* Matching brackets */
+        .CodeMirror-matchingbracket {
+            color: #00E676 !important;
+            text-decoration: underline;
+            font-weight: bold;
+        }
+        .CodeMirror-nonmatchingbracket {
+            color: #FF5252 !important;
+        }
+
+        /* Scrollbars */
+        .CodeMirror-vscrollbar::-webkit-scrollbar,
+        .CodeMirror-hscrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .CodeMirror-vscrollbar::-webkit-scrollbar-track,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+            background: rgba(108, 99, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        /* Custom token overrides for deeper syntax color palette */
+        .cm-s-material-darker .cm-keyword   { color: #C792EA !important; }
+        .cm-s-material-darker .cm-string    { color: #C3E88D !important; }
+        .cm-s-material-darker .cm-number    { color: #F78C6C !important; }
+        .cm-s-material-darker .cm-comment   { color: #546E7A !important; font-style: italic; }
+        .cm-s-material-darker .cm-def       { color: #82AAFF !important; }
+        .cm-s-material-darker .cm-variable  { color: #EEFFFF !important; }
+        .cm-s-material-darker .cm-variable-2 { color: #F07178 !important; }
+        .cm-s-material-darker .cm-property  { color: #FFCB6B !important; }
+        .cm-s-material-darker .cm-operator  { color: #89DDFF !important; }
+        .cm-s-material-darker .cm-atom      { color: #F78C6C !important; }
+    </style>
+</head>
+<body>
+    <textarea id="code"></textarea>
+
+    <script src="codemirror.min.js"></script>
+    <script src="javascript.min.js"></script>
+    <script src="closebrackets.min.js"></script>
+    <script src="matchbrackets.min.js"></script>
+    <script src="active-line.min.js"></script>
+    <script src="comment.min.js"></script>
+    <script>
+        console.log("Scriptam: script tag executing. CodeMirror type: " + (typeof CodeMirror));
+        var editor = null;
+        var pendingCode = null;
+
+        function b64ToUtf8(str) {
+            try {
+                var binStr = atob(str);
+                var bytes = new Uint8Array(binStr.length);
+                for (var i = 0; i < binStr.length; i++) {
+                    bytes[i] = binStr.charCodeAt(i);
+                }
+                return new TextDecoder().decode(bytes);
+            } catch (e) {
+                try {
+                    return decodeURIComponent(escape(atob(str)));
+                } catch (e2) {
+                    return atob(str);
+                }
+            }
+        }
+
+        function initEditor() {
+            if (editor) return;
+            console.log("Scriptam: initEditor starting");
+            var textarea = document.getElementById('code');
+            if (!textarea) {
+                console.error("Scriptam: textarea #code not found!");
+                return;
+            }
+
+            try {
+                editor = CodeMirror.fromTextArea(textarea, {
+                    mode:              'javascript',
+                    theme:             'material-darker',
+                    lineNumbers:       true,
+                    autoCloseBrackets: true,
+                    matchBrackets:     true,
+                    styleActiveLine:   true,
+                    indentUnit:        2,
+                    tabSize:           2,
+                    indentWithTabs:    false,
+                    lineWrapping:      true,
+                    extraKeys: {
+                        'Ctrl-/':  'toggleComment',
+                        'Cmd-/':   'toggleComment',
+                        'Tab':     function(cm) {
+                            if (cm.somethingSelected()) {
+                                cm.indentSelection('add');
+                            } else {
+                                cm.replaceSelection('  ', 'end');
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("Scriptam: CodeMirror initialization failed: " + err);
+                return;
+            }
+
+            /* --- Bridge: JS -> Android --- */
+            var _changeTimer = null;
+            editor.on('change', function() {
+                clearTimeout(_changeTimer);
+                _changeTimer = setTimeout(function() {
+                    try {
+                        if (window.ScriptamBridge && window.ScriptamBridge.onCodeChange) {
+                            ScriptamBridge.onCodeChange(editor.getValue());
+                        }
+                    } catch (e) { }
+                }, 200);
+            });
+
+            window.addEventListener('resize', function() {
+                if (editor) {
+                    editor.refresh();
+                }
+            });
+
+            // If code was already delivered before init finished
+            if (pendingCode !== null) {
+                setCodeBase64(pendingCode);
+                pendingCode = null;
+            } else {
+                // Pull directly from Android bridge if available
+                try {
+                    if (window.ScriptamBridge && window.ScriptamBridge.getInitialCode) {
+                        var initialB64 = window.ScriptamBridge.getInitialCode();
+                        if (initialB64) {
+                            setCodeBase64(initialB64);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Scriptam: Error getting initial code from bridge: " + e);
+                }
+            }
+
+            // Signal readiness to Android
+            try {
+                if (window.ScriptamBridge && window.ScriptamBridge.onEditorReady) {
+                    ScriptamBridge.onEditorReady();
+                }
+            } catch (e) {}
+
+            setTimeout(function() {
+                if (editor) editor.refresh();
+            }, 50);
+        }
+
+        /** Set editor content from a Base64-encoded string (avoids escaping issues). */
+        function setCodeBase64(b64) {
+            if (!editor) {
+                pendingCode = b64;
+                return;
+            }
+            try {
+                var decoded = b64ToUtf8(b64);
+                editor.setValue(decoded);
+            } catch (e) {
+                console.error("Scriptam: Error decoding code: " + e);
+                try {
+                    editor.setValue(atob(b64));
+                } catch (e2) {}
+            }
+            editor.clearHistory();
+            editor.setCursor(0, 0);
+            setTimeout(function() {
+                if (editor) editor.refresh();
+            }, 50);
+        }
+
+        /** Return current editor content. */
+        function getCode() {
+            return editor ? editor.getValue() : "";
+        }
+
+        /** Toggle read-only mode (used during script execution). */
+        function setReadOnly(flag) {
+            if (!editor) return;
+            editor.setOption('readOnly', flag ? 'nocursor' : false);
+            document.body.style.opacity = flag ? '0.6' : '1';
+        }
+
+        // Initialize immediately
+        initEditor();
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Configuration activity layout shown when user adds the widget to their home screen.
+    Standard Android View layout (no Compose) since this is launched by the launcher.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/config_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Add Script Widget"
+        android:textColor="#FFFFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="Choose which script to display"
+        android:textColor="#80FFFFFF"
+        android:textSize="14sp" />
+
+    <ListView
+        android:id="@+id/config_script_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#14FFFFFF"
+        android:dividerHeight="1dp"
+        android:background="#1AFFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/config_add_button"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:enabled="false"
+        android:text="Add Widget"
+        android:textColor="#FFFFFFFF"
+        android:backgroundTint="#FF6C63FF" />
+
+</LinearLayout>
