@@ -156,6 +156,7 @@
                     tabSize:           2,
                     indentWithTabs:    false,
                     lineWrapping:      true,
+                    inputStyle:        'textarea',
                     extraKeys: {
                         'Ctrl-/':  'toggleComment',
                         'Cmd-/':   'toggleComment',
@@ -230,11 +231,18 @@
             }
             try {
                 var decoded = b64ToUtf8(b64);
+                if (editor.getValue() === decoded) {
+                    return; // Avoid resetting cursor if code hasn't changed
+                }
                 editor.setValue(decoded);
             } catch (e) {
                 console.error("Scriptam: Error decoding code: " + e);
                 try {
-                    editor.setValue(atob(b64));
+                    var plainDecoded = atob(b64);
+                    if (editor.getValue() === plainDecoded) {
+                        return;
+                    }
+                    editor.setValue(plainDecoded);
                 } catch (e2) {}
             }
             editor.clearHistory();
@@ -255,6 +263,24 @@
             editor.setOption('readOnly', flag ? 'nocursor' : false);
             document.body.style.opacity = flag ? '0.6' : '1';
         }
+
+        /** Ensure tapping on editor triggers focus and brings up the keyboard */
+        function focusEditor() {
+            if (editor) {
+                if (!editor.hasFocus()) {
+                    editor.focus();
+                }
+                try {
+                    if (window.ScriptamBridge && window.ScriptamBridge.showKeyboard) {
+                        window.ScriptamBridge.showKeyboard();
+                    }
+                } catch (e) {}
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            focusEditor();
+        });
 
         // Initialize immediately
         initEditor();

@@ -1,7 +1,11 @@
 package com.scriptam.app.ui.editor
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.util.Base64
+import android.view.MotionEvent
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -23,7 +27,7 @@ import androidx.compose.ui.viewinterop.AndroidView
  * @param onCodeChange Called (debounced 200ms) when the user edits code in the editor.
  * @param isReadOnly   When true, the editor dims and disables input (e.g., during execution).
  */
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 fun WebViewEditor(
     initialCode: String,
@@ -37,10 +41,16 @@ fun WebViewEditor(
     AndroidView(
         factory = { context ->
             WebView(context).apply {
-                layoutParams = android.view.ViewGroup.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
                 )
+
+                // Allow focus and soft keyboard input inside Compose AndroidView
+                isFocusable = true
+                isFocusableInTouchMode = true
+                requestFocusFromTouch()
+
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
@@ -56,13 +66,29 @@ fun WebViewEditor(
                 // Transparent background to match our dark theme during load
                 setBackgroundColor(android.graphics.Color.parseColor("#0D0D14"))
 
+                webChromeClient = WebChromeClient()
+
                 addJavascriptInterface(
                     EditorJsBridge(
+                        webView = this,
                         codeProvider = { currentInitialCode },
                         onCodeChange = { currentOnCodeChange(it) }
                     ),
                     "ScriptamBridge"
                 )
+
+                // Delegate focus to WebView on touch so virtual keyboard triggers reliably
+                setOnTouchListener { v, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN,
+                        MotionEvent.ACTION_UP -> {
+                            if (!v.hasFocus()) {
+                                v.requestFocus()
+                            }
+                        }
+                    }
+                    false
+                }
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String) {
@@ -92,6 +118,7 @@ fun WebViewEditor(
  * Runs on a WebView background thread — callers must be thread-safe.
  */
 private class EditorJsBridge(
+    private val webView: WebView,
     private val codeProvider: () -> String,
     private val onCodeChange: (String) -> Unit
 ) {
@@ -112,5 +139,14 @@ private class EditorJsBridge(
     @JavascriptInterface
     fun onEditorReady() {
         // Editor loaded; initial code can be injected or pulled.
+    }
+
+    @JavascriptInterface
+    fun showKeyboard() {
+        webView.post {
+            webView.requestFocus()
+            val imm = webView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(webView, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 }

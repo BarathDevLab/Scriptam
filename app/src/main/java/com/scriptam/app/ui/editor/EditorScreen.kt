@@ -145,12 +145,14 @@ fun EditorScreen(
             ) {
                 if (script != null) {
                     // WebView-based CodeMirror editor with syntax highlighting
-                    WebViewEditor(
-                        initialCode = code,
-                        onCodeChange = { viewModel.onCodeChange(it) },
-                        isReadOnly = isRunning,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    androidx.compose.runtime.key(script?.id) {
+                        WebViewEditor(
+                            initialCode = code,
+                            onCodeChange = { viewModel.onCodeChange(it) },
+                            isReadOnly = isRunning,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 } else {
                     // Loading state
                     Box(

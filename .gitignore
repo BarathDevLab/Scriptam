@@ -13,3 +13,4 @@ local.properties
 *.hprof
 .kotlin
 .agents
+emulator_screen.png
