@@ -4,8 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -40,12 +44,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -58,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,11 +72,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scriptam.app.data.db.ScriptEntity
+import com.scriptam.app.ui.runner.RunnerPopup
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     onScriptClick: (Long) -> Unit,
@@ -79,6 +87,12 @@ fun DashboardScreen(
     val showDialog by viewModel.showCreateDialog.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
+
+    // Context menu state
+    var contextScript by remember { mutableStateOf<ScriptEntity?>(null) }
+
+    // Runner popup state
+    var runnerScriptId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         modifier = Modifier
@@ -226,6 +240,8 @@ fun DashboardScreen(
                         SwipeToDismissScriptCard(
                             script = script,
                             onClick = { onScriptClick(script.id) },
+                            onLongClick = { contextScript = script },
+                            onRun = { runnerScriptId = script.id },
                             onDelete = { viewModel.deleteScript(script) }
                         )
                     }
@@ -241,13 +257,43 @@ fun DashboardScreen(
             onCreate = { title -> viewModel.createScript(title) }
         )
     }
+
+    // Context menu bottom sheet
+    contextScript?.let { script ->
+        ScriptContextSheet(
+            script = script,
+            onDismiss = { contextScript = null },
+            onRun = {
+                contextScript = null
+                runnerScriptId = script.id
+            },
+            onOpenEditor = {
+                contextScript = null
+                onScriptClick(script.id)
+            },
+            onDelete = {
+                contextScript = null
+                viewModel.deleteScript(script)
+            }
+        )
+    }
+
+    // Runner popup
+    runnerScriptId?.let { id ->
+        RunnerPopup(
+            scriptId = id,
+            onDismiss = { runnerScriptId = null }
+        )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun SwipeToDismissScriptCard(
     script: ScriptEntity,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onRun: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -288,21 +334,32 @@ private fun SwipeToDismissScriptCard(
         },
         enableDismissFromStartToEnd = false
     ) {
-        ScriptCard(script = script, onClick = onClick)
+        ScriptCard(
+            script = script,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            onRun = onRun
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ScriptCard(
     script: ScriptEntity,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    onRun: () -> Unit = {}
 ) {
     val accentColor = Color(script.accentColor.toULong())
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -312,7 +369,7 @@ private fun ScriptCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Accent indicator
@@ -347,6 +404,16 @@ private fun ScriptCard(
                     text = formatTimestamp(script.lastModified),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Run button
+            IconButton(onClick = onRun) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Run",
+                    tint = Color(0xFF00E676),
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
@@ -397,6 +464,124 @@ private fun CreateScriptDialog(
             }
         }
     )
+}
+
+// ── Context Menu Bottom Sheet ────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScriptContextSheet(
+    script: ScriptEntity,
+    onDismiss: () -> Unit,
+    onRun: () -> Unit,
+    onOpenEditor: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val accentColor = Color(script.accentColor.toULong())
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF1A1A2E),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Script title header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accentColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Code,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = script.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = formatTimestamp(script.lastModified),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Menu options
+            ContextMenuItem(
+                icon = Icons.Default.PlayArrow,
+                label = "Run Code",
+                tint = Color(0xFF00E676),
+                onClick = onRun
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ContextMenuItem(
+                icon = Icons.Default.Edit,
+                label = "Open in Editor",
+                tint = Color(0xFF6C63FF),
+                onClick = onOpenEditor
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ContextMenuItem(
+                icon = Icons.Default.Delete,
+                label = "Delete",
+                tint = Color(0xFFFF5252),
+                onClick = onDelete
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContextMenuItem(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White
+        )
+    }
 }
 
 private fun formatTimestamp(millis: Long): String {

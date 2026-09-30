@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,12 +34,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scriptam.app.ui.console.ConsoleSheet
+import com.scriptam.app.ui.runner.RunnerPopup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +57,9 @@ fun EditorScreen(
     val isRunning by viewModel.isRunning.collectAsState()
     val showConsole by viewModel.showConsole.collectAsState()
     val consoleEntries by viewModel.consoleEntries.collectAsState()
+
+    // Interactive runner popup state
+    var showRunnerPopup by remember { mutableStateOf(false) }
 
     LaunchedEffect(scriptId) {
         viewModel.loadScript(scriptId)
@@ -104,7 +112,7 @@ fun EditorScreen(
                         )
                     }
 
-                    // Run button
+                    // Console run button (runs in-place, logs to console)
                     IconButton(
                         onClick = { viewModel.runScript() },
                         enabled = !isRunning
@@ -120,10 +128,25 @@ fun EditorScreen(
                         } else {
                             Icon(
                                 Icons.Default.PlayArrow,
-                                contentDescription = "Run Script",
+                                contentDescription = "Run (Console)",
                                 tint = Color(0xFF00E676)
                             )
                         }
+                    }
+
+                    // Interactive run button (opens runner popup)
+                    IconButton(
+                        onClick = {
+                            viewModel.saveCode()
+                            showRunnerPopup = true
+                        },
+                        enabled = !isRunning && script != null
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = "Run (Interactive)",
+                            tint = Color(0xFF6C63FF)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -183,5 +206,13 @@ fun EditorScreen(
                 )
             }
         }
+    }
+
+    // Interactive runner popup overlay
+    if (showRunnerPopup && script != null) {
+        RunnerPopup(
+            scriptId = script!!.id,
+            onDismiss = { showRunnerPopup = false }
+        )
     }
 }
