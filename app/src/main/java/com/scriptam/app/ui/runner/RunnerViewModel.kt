@@ -25,16 +25,11 @@ import kotlinx.coroutines.launch
  */
 class RunnerViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = (application as ScriptamApp).scriptRepository
-    private val engineManager = ScriptEngineManager()
+    private val app = application as ScriptamApp
+    private val repository = app.scriptRepository
+    private val engineManager = app.scriptEngineManager
     private val console = ScriptConsole()
-
-    private val bridge = AndroidBridge(
-        context = application,
-        uiModule = UIModule(application),
-        storageModule = StorageModule(application),
-        networkModule = NetworkModule()
-    )
+    private val bridge = AndroidBridge.createDefault(application)
 
     private val _script = MutableStateFlow<ScriptEntity?>(null)
     val script: StateFlow<ScriptEntity?> = _script.asStateFlow()

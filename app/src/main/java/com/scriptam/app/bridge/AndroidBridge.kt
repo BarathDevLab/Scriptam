@@ -63,4 +63,16 @@ class AndroidBridge(
             """.trimIndent()
         )
     }
+
+    companion object {
+        fun createDefault(context: Context): AndroidBridge {
+            val appCtx = context.applicationContext
+            return AndroidBridge(
+                context = appCtx,
+                uiModule = UIModule(appCtx),
+                storageModule = StorageModule(appCtx),
+                networkModule = NetworkModule()
+            )
+        }
+    }
 }

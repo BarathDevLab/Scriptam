@@ -191,4 +191,34 @@ class WidgetPayloadParserTest {
         assertEquals("like", card.buttons[3].action)
         assertEquals("#FF5252", card.buttons[3].color)
     }
+
+    @Test
+    fun parse_listPayloadWithColorsAndStatus_returnsParsedItems() {
+        val json = """
+            {
+                "type": "list",
+                "title": "Server Status",
+                "items": [
+                    { "label": "API", "value": "Online", "color": "#00E676", "statusColor": "#00FF00" },
+                    { "label": "DB", "value": "Degraded", "color": "#FFD600", "statusColor": "#FFAA00" }
+                ]
+            }
+        """.trimIndent()
+
+        val result = WidgetPayloadParser.parse(json)
+        assertTrue(result is ListWidgetPayload)
+        val list = result as ListWidgetPayload
+
+        assertEquals("Server Status", list.title)
+        assertEquals(2, list.items.size)
+        assertEquals("API", list.items[0].label)
+        assertEquals("Online", list.items[0].value)
+        assertEquals("#00E676", list.items[0].color)
+        assertEquals("#00FF00", list.items[0].statusColor)
+
+        assertEquals("DB", list.items[1].label)
+        assertEquals("Degraded", list.items[1].value)
+        assertEquals("#FFD600", list.items[1].color)
+        assertEquals("#FFAA00", list.items[1].statusColor)
+    }
 }

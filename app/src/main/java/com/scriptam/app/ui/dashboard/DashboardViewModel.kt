@@ -6,14 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.scriptam.app.ScriptamApp
 import com.scriptam.app.data.db.ScriptEntity
 import com.scriptam.app.ui.theme.ScriptAccentColors
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(FlowPreview::class)
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = (application as ScriptamApp).scriptRepository
@@ -27,7 +30,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     /** Filtered scripts based on search query. */
     val scripts: StateFlow<List<ScriptEntity>> = combine(
         allScripts,
-        _searchQuery
+        _searchQuery.debounce { if (it.isBlank()) 0L else 300L }
     ) { scripts, query ->
         if (query.isBlank()) scripts
         else scripts.filter { it.title.contains(query, ignoreCase = true) }

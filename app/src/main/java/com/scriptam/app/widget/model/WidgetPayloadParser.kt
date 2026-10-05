@@ -97,19 +97,7 @@ object WidgetPayloadParser {
     }
 
     private fun parseList(json: JSONObject): ListWidgetPayload {
-        val itemsArray = json.optJSONArray("items") ?: JSONArray()
-        val items = mutableListOf<WidgetListItem>()
-        for (i in 0 until itemsArray.length()) {
-            val itemObj = itemsArray.optJSONObject(i) ?: continue
-            items.add(
-                WidgetListItem(
-                    label = itemObj.optString("label", ""),
-                    value = itemObj.optString("value", ""),
-                    color = itemObj.optStringOrNull("color"),
-                    statusColor = itemObj.optStringOrNull("statusColor")
-                )
-            )
-        }
+        val items = parseItems(json)
         val buttons = parseButtons(json)
         val primaryBtn = buttons.firstOrNull()
         return ListWidgetPayload(
@@ -126,19 +114,7 @@ object WidgetPayloadParser {
     }
 
     private fun parseCard(json: JSONObject): CardWidgetPayload {
-        val itemsArray = json.optJSONArray("items") ?: JSONArray()
-        val items = mutableListOf<WidgetListItem>()
-        for (i in 0 until itemsArray.length()) {
-            val itemObj = itemsArray.optJSONObject(i) ?: continue
-            items.add(
-                WidgetListItem(
-                    label = itemObj.optString("label", ""),
-                    value = itemObj.optString("value", ""),
-                    color = itemObj.optStringOrNull("color"),
-                    statusColor = itemObj.optStringOrNull("statusColor")
-                )
-            )
-        }
+        val items = parseItems(json)
         val buttons = parseButtons(json)
         val primaryBtn = buttons.firstOrNull()
         return CardWidgetPayload(
@@ -153,6 +129,23 @@ object WidgetPayloadParser {
             bg = json.optStringOrNull("bg") ?: json.optStringOrNull("background"),
             padding = parsePadding(json)
         )
+    }
+
+    private fun parseItems(json: JSONObject): List<WidgetListItem> {
+        val itemsArray = json.optJSONArray("items") ?: return emptyList()
+        val items = ArrayList<WidgetListItem>(itemsArray.length())
+        for (i in 0 until itemsArray.length()) {
+            val itemObj = itemsArray.optJSONObject(i) ?: continue
+            items.add(
+                WidgetListItem(
+                    label = itemObj.optString("label", ""),
+                    value = itemObj.optString("value", ""),
+                    color = itemObj.optStringOrNull("color"),
+                    statusColor = itemObj.optStringOrNull("statusColor")
+                )
+            )
+        }
+        return items
     }
 
     private fun parseButtons(json: JSONObject): List<WidgetButton> {

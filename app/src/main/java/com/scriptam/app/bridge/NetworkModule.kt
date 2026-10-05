@@ -16,12 +16,18 @@ import java.util.concurrent.TimeUnit
  *
  * Returns the response body as a string, or an error JSON on failure.
  */
-class NetworkModule {
+class NetworkModule(
+    private val client: OkHttpClient = sharedClient
+) {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    companion object {
+        val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+        }
+    }
 
     fun install(quickJs: QuickJs) {
         quickJs.function<String>("__native_fetch") { args ->

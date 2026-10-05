@@ -9,7 +9,11 @@ import kotlinx.coroutines.flow.update
  * Captures `console.log()`, `console.warn()`, `console.error()`, and `console.info()`
  * calls from the QuickJS context and exposes them as a [StateFlow] for the UI.
  */
-class ScriptConsole {
+class ScriptConsole(private val maxEntries: Int = DEFAULT_MAX_ENTRIES) {
+
+    companion object {
+        const val DEFAULT_MAX_ENTRIES = 500
+    }
 
     private val _entries = MutableStateFlow<List<ConsoleEntry>>(emptyList())
     val entries: StateFlow<List<ConsoleEntry>> = _entries.asStateFlow()
@@ -24,8 +28,13 @@ class ScriptConsole {
     }
 
     private fun append(message: String, level: ConsoleEntry.Level) {
+        val entry = ConsoleEntry(message = message, level = level)
         _entries.update { current ->
-            current + ConsoleEntry(message = message, level = level)
+            if (current.size >= maxEntries) {
+                current.takeLast(maxEntries - 1) + entry
+            } else {
+                current + entry
+            }
         }
     }
 }

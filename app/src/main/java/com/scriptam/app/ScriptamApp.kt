@@ -7,6 +7,9 @@ class ScriptamApp : Application() {
     lateinit var scriptRepository: com.scriptam.app.data.repository.ScriptRepository
         private set
 
+    lateinit var scriptEngineManager: com.scriptam.app.core.ScriptEngineManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
 
@@ -16,5 +19,6 @@ class ScriptamApp : Application() {
             scriptDao = database.scriptDao(),
             fileManager = fileManager
         )
+        scriptEngineManager = com.scriptam.app.core.ScriptEngineManager()
     }
 }

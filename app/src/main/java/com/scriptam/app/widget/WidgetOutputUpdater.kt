@@ -20,21 +20,26 @@ object WidgetOutputUpdater {
         output: String,
         isWidgetUI: Boolean = false
     ) {
-        val manager = AppWidgetManager.getInstance(context)
-        val widgetIds = manager.getAppWidgetIds(
-            ComponentName(context, ScriptWidget::class.java)
-        )
+        val indexedIds = WidgetPrefs.getWidgetIdsForScript(context, scriptId)
+        val targetIds: Collection<Int> = if (indexedIds.isNotEmpty()) {
+            indexedIds
+        } else {
+            // Fallback for widgets bound before the inverted index was populated
+            val manager = AppWidgetManager.getInstance(context)
+            val allWidgetIds = manager.getAppWidgetIds(
+                ComponentName(context, ScriptWidget::class.java)
+            )
+            allWidgetIds.filter { WidgetPrefs.getScriptId(context, it) == scriptId }
+        }
 
-        for (widgetId in widgetIds) {
-            if (WidgetPrefs.getScriptId(context, widgetId) == scriptId) {
-                ScriptWidget.updateWidgetOutput(
-                    context = context,
-                    widgetId = widgetId,
-                    output = output,
-                    timestamp = System.currentTimeMillis(),
-                    isWidgetUI = isWidgetUI
-                )
-            }
+        for (widgetId in targetIds) {
+            ScriptWidget.updateWidgetOutput(
+                context = context,
+                widgetId = widgetId,
+                output = output,
+                timestamp = System.currentTimeMillis(),
+                isWidgetUI = isWidgetUI
+            )
         }
     }
 }

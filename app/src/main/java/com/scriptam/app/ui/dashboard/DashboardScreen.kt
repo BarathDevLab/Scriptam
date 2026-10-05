@@ -351,7 +351,7 @@ private fun ScriptCard(
     onLongClick: () -> Unit = {},
     onRun: () -> Unit = {}
 ) {
-    val accentColor = Color(script.accentColor.toULong())
+    val accentColor = remember(script.accentColor) { Color(script.accentColor.toULong()) }
 
     Card(
         modifier = Modifier
@@ -478,7 +478,7 @@ private fun ScriptContextSheet(
     onDelete: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
-    val accentColor = Color(script.accentColor.toULong())
+    val accentColor = remember(script.accentColor) { Color(script.accentColor.toULong()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -584,7 +584,8 @@ private fun ContextMenuItem(
     }
 }
 
-private fun formatTimestamp(millis: Long): String {
-    val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-    return sdf.format(Date(millis))
+private val timestampFormatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+
+private fun formatTimestamp(millis: Long): String = synchronized(timestampFormatter) {
+    timestampFormatter.format(Date(millis))
 }

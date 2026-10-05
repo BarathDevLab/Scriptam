@@ -46,14 +46,9 @@ class ScriptWorker(
         val code = repository.readScriptContent(script.fileName)
         if (code.isBlank()) return Result.failure()
 
-        val engineManager = ScriptEngineManager()
+        val engineManager = app.scriptEngineManager
         val console = ScriptConsole()
-        val bridge = AndroidBridge(
-            context = applicationContext,
-            uiModule = UIModule(applicationContext),
-            storageModule = StorageModule(applicationContext),
-            networkModule = NetworkModule()
-        )
+        val bridge = AndroidBridge.createDefault(applicationContext)
 
         val action = inputData.getString(KEY_ACTION)
 

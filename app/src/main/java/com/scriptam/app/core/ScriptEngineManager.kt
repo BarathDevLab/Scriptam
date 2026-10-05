@@ -5,6 +5,7 @@ import com.dokar.quickjs.binding.function
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /**
  * Result of script execution containing the return value and optional widget UI JSON.
@@ -23,6 +24,34 @@ data class ScriptExecutionResult(
  */
 class ScriptEngineManager {
 
+    companion object {
+        const val DEFAULT_TIMEOUT_MS = 30_000L
+
+        private val CONSOLE_JS = """
+            var console = {
+                log:   function() { __scriptam_log.apply(null, arguments);   },
+                warn:  function() { __scriptam_warn.apply(null, arguments);  },
+                error: function() { __scriptam_error.apply(null, arguments); },
+                info:  function() { __scriptam_info.apply(null, arguments);  }
+            };
+        """.trimIndent()
+
+        private val WIDGET_CHECK_JS = """
+            (function() {
+                if (typeof widgetUI === 'function') {
+                    try {
+                        var res = widgetUI();
+                        return (res && typeof res === 'object') ? JSON.stringify(res) : null;
+                    } catch (e) {
+                        console.error("widgetUI error: " + e);
+                        return null;
+                    }
+                }
+                return null;
+            })()
+        """.trimIndent()
+    }
+
     private val engineDispatcher: CoroutineDispatcher =
         Dispatchers.Default.limitedParallelism(1)
 
@@ -32,6 +61,7 @@ class ScriptEngineManager {
      *
      * @param script        The JavaScript source code to execute.
      * @param console       Console sink for `console.log()` / `.warn()` / `.error()`.
+     * @param timeoutMs     Execution timeout in milliseconds (default 30 seconds).
      * @param bridgeInstaller Optional lambda that receives the [QuickJs] instance to install
      *                        native bridge modules (e.g., `Native.showToast()`).
      * @return [ScriptExecutionResult] containing the evaluated result and any widget UI JSON.
@@ -40,56 +70,51 @@ class ScriptEngineManager {
         script: String,
         console: ScriptConsole,
         action: String? = null,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS,
         bridgeInstaller: (suspend (QuickJs) -> Unit)? = null
     ): Result<ScriptExecutionResult> = withContext(engineDispatcher) {
-        val quickJs = QuickJs.create(jobDispatcher = engineDispatcher)
         try {
-            // Inject console.log / .warn / .error / .info
-            installConsole(quickJs, console)
+            withTimeout(timeoutMs) {
+                val quickJs = QuickJs.create(jobDispatcher = engineDispatcher)
+                try {
+                    // Inject console.log / .warn / .error / .info
+                    installConsole(quickJs, console)
 
-            // Inject declarative Widget DSL
-            installWidgetDsl(quickJs, action)
+                    // Inject declarative Widget DSL
+                    installWidgetDsl(quickJs, action)
 
-            // Let the bridge layer install its own global modules
-            bridgeInstaller?.invoke(quickJs)
+                    // Let the bridge layer install its own global modules
+                    bridgeInstaller?.invoke(quickJs)
 
-            // Also expose action on Native if installed
-            val actionLiteral = if (action != null) "\"$action\"" else "null"
-            quickJs.evaluate<Any?>(
-                "(function() { if (typeof Native !== 'undefined') { Native.action = $actionLiteral; } })();"
-            )
+                    // Also expose action on Native if installed
+                    val actionLiteral = if (action != null) "\"$action\"" else "null"
+                    quickJs.evaluate<Any?>(
+                        "(function() { if (typeof Native !== 'undefined') { Native.action = $actionLiteral; } })();"
+                    )
 
-            // Execute the user's script
-            val result = quickJs.evaluate<Any?>(script)
+                    // Execute the user's script
+                    val result = quickJs.evaluate<Any?>(script)
 
-            // Check if widgetUI() was defined and returned a UI payload
-            val widgetJson = try {
-                quickJs.evaluate<String?>(
-                    """
-                    (function() {
-                        if (typeof widgetUI === 'function') {
-                            try {
-                                var res = widgetUI();
-                                return (res && typeof res === 'object') ? JSON.stringify(res) : null;
-                            } catch (e) {
-                                console.error("widgetUI error: " + e);
-                                return null;
-                            }
-                        }
-                        return null;
-                    })()
-                    """.trimIndent()
-                )
-            } catch (_: Exception) {
-                null
+                    // Check if widgetUI() was defined and returned a UI payload
+                    val widgetJson = try {
+                        quickJs.evaluate<String?>(WIDGET_CHECK_JS)
+                    } catch (_: Exception) {
+                        null
+                    }
+
+                    Result.success(ScriptExecutionResult(value = result, widgetPayloadJson = widgetJson))
+                } finally {
+                    quickJs.close()
+                }
             }
-
-            Result.success(ScriptExecutionResult(value = result, widgetPayloadJson = widgetJson))
         } catch (e: Exception) {
-            console.error(e.message ?: "Unknown script error")
+            val msg = if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                "Script execution timed out after ${timeoutMs}ms"
+            } else {
+                e.message ?: "Unknown script error"
+            }
+            console.error(msg)
             Result.failure(e)
-        } finally {
-            quickJs.close()
         }
     }
 
@@ -111,16 +136,7 @@ class ScriptEngineManager {
             console.info(args.joinToString(" ") { it.toString() })
         }
 
-        quickJs.evaluate<Any?>(
-            """
-            var console = {
-                log:   function() { __scriptam_log.apply(null, arguments);   },
-                warn:  function() { __scriptam_warn.apply(null, arguments);  },
-                error: function() { __scriptam_error.apply(null, arguments); },
-                info:  function() { __scriptam_info.apply(null, arguments);  }
-            };
-            """.trimIndent()
-        )
+        quickJs.evaluate<Any?>(CONSOLE_JS)
     }
 
     /**

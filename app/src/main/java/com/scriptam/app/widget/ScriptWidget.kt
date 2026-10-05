@@ -25,8 +25,6 @@ import java.util.Locale
  */
 class ScriptWidget : AppWidgetProvider() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -63,9 +61,13 @@ class ScriptWidget : AppWidgetProvider() {
     // -------------------------------------------------------------------------
 
     private fun handleRunScript(context: Context, widgetId: Int, scriptId: Long, action: String? = null) {
-        // Kick off execution via WorkManager immediately
-        scope.launch {
-            com.scriptam.app.worker.ScriptWorker.enqueueOnce(context, scriptId, action)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                com.scriptam.app.worker.ScriptWorker.enqueueOnce(context, scriptId, action)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
@@ -73,6 +75,8 @@ class ScriptWidget : AppWidgetProvider() {
         const val ACTION_RUN_SCRIPT = "com.scriptam.app.widget.ACTION_RUN_SCRIPT"
         const val EXTRA_SCRIPT_ID = "extra_script_id"
         const val EXTRA_ACTION = "extra_action"
+
+        private val widgetTimestampFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
         /**
          * Rebuild and push a widget update.
@@ -132,7 +136,9 @@ class ScriptWidget : AppWidgetProvider() {
             views.setTextViewText(
                 R.id.widget_timestamp,
                 if (timestamp != null && timestamp > 0)
-                    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))
+                    synchronized(widgetTimestampFormatter) {
+                        widgetTimestampFormatter.format(Date(timestamp))
+                    }
                 else "–"
             )
 

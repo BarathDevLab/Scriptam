@@ -25,6 +25,7 @@ object WidgetPrefs {
     private const val KEY_IS_WIDGET_UI  = "widget_%d_is_widget_ui"
     private const val KEY_LAST_RUN      = "widget_%d_last_run"
     private const val KEY_INTERVAL      = "widget_%d_interval"
+    private const val KEY_SCRIPT_WIDGETS = "script_%d_widgets"
 
     // ---- Getters ----
 
@@ -49,6 +50,11 @@ object WidgetPrefs {
     fun getIntervalMinutes(ctx: Context, id: Int): Long =
         prefs(ctx).getLong(key(KEY_INTERVAL, id), 0L)
 
+    fun getWidgetIdsForScript(ctx: Context, scriptId: Long): Set<Int> {
+        val raw = prefs(ctx).getStringSet(key(KEY_SCRIPT_WIDGETS, scriptId), emptySet()) ?: emptySet()
+        return raw.mapNotNull { it.toIntOrNull() }.toSet()
+    }
+
     // ---- Setters ----
 
     fun saveScriptBinding(
@@ -58,11 +64,25 @@ object WidgetPrefs {
         title: String,
         accentColor: Int
     ) {
-        prefs(ctx).edit()
+        val p = prefs(ctx)
+        val oldScriptId = p.getLong(key(KEY_SCRIPT_ID, widgetId), -1L)
+        val editor = p.edit()
             .putLong(key(KEY_SCRIPT_ID, widgetId), scriptId)
             .putString(key(KEY_SCRIPT_TITLE, widgetId), title)
             .putInt(key(KEY_ACCENT_COLOR, widgetId), accentColor)
-            .apply()
+
+        if (oldScriptId != -1L && oldScriptId != scriptId) {
+            val oldSet = p.getStringSet(key(KEY_SCRIPT_WIDGETS, oldScriptId), emptySet())?.toMutableSet()
+            if (oldSet != null && oldSet.remove(widgetId.toString())) {
+                editor.putStringSet(key(KEY_SCRIPT_WIDGETS, oldScriptId), oldSet)
+            }
+        }
+
+        val newSet = p.getStringSet(key(KEY_SCRIPT_WIDGETS, scriptId), emptySet())?.toMutableSet() ?: mutableSetOf()
+        newSet.add(widgetId.toString())
+        editor.putStringSet(key(KEY_SCRIPT_WIDGETS, scriptId), newSet)
+
+        editor.apply()
     }
 
     fun saveOutput(
@@ -86,7 +106,9 @@ object WidgetPrefs {
     }
 
     fun clearWidget(ctx: Context, widgetId: Int) {
-        prefs(ctx).edit()
+        val p = prefs(ctx)
+        val scriptId = p.getLong(key(KEY_SCRIPT_ID, widgetId), -1L)
+        val editor = p.edit()
             .remove(key(KEY_SCRIPT_ID, widgetId))
             .remove(key(KEY_SCRIPT_TITLE, widgetId))
             .remove(key(KEY_ACCENT_COLOR, widgetId))
@@ -94,11 +116,20 @@ object WidgetPrefs {
             .remove(key(KEY_IS_WIDGET_UI, widgetId))
             .remove(key(KEY_LAST_RUN, widgetId))
             .remove(key(KEY_INTERVAL, widgetId))
-            .apply()
+
+        if (scriptId != -1L) {
+            val set = p.getStringSet(key(KEY_SCRIPT_WIDGETS, scriptId), emptySet())?.toMutableSet()
+            if (set != null && set.remove(widgetId.toString())) {
+                editor.putStringSet(key(KEY_SCRIPT_WIDGETS, scriptId), set)
+            }
+        }
+
+        editor.apply()
     }
 
     // ---- Helpers ----
 
     private fun key(template: String, id: Int) = template.format(id)
+    private fun key(template: String, id: Long) = template.format(id)
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 }
