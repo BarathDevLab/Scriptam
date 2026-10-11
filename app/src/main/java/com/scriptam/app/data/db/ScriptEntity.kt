@@ -11,5 +11,9 @@ data class ScriptEntity(
     val title: String,
     val accentColor: Long = 0xFF6C63FF,
     val lastModified: Long = System.currentTimeMillis(),
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Last execution status: "SUCCESS", "ERROR", "TIMEOUT", or "NEVER" */
+    val lastRunStatus: String = "NEVER",
+    /** Last execution duration in milliseconds (-1 = never run) */
+    val lastRunDurationMs: Long = -1L
 )

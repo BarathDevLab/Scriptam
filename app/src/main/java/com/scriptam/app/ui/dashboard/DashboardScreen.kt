@@ -400,11 +400,22 @@ private fun ScriptCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = formatTimestamp(script.lastModified),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = formatTimestamp(script.lastModified),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (script.lastRunStatus != "NEVER") {
+                        TelemetryBadge(
+                            status = script.lastRunStatus,
+                            durationMs = script.lastRunDurationMs
+                        )
+                    }
+                }
             }
 
             // Run button
@@ -589,3 +600,40 @@ private val timestampFormatter = SimpleDateFormat("MMM d, h:mm a", Locale.getDef
 private fun formatTimestamp(millis: Long): String = synchronized(timestampFormatter) {
     timestampFormatter.format(Date(millis))
 }
+
+@Composable
+private fun TelemetryBadge(
+    status: String,
+    durationMs: Long,
+    modifier: Modifier = Modifier
+) {
+    val (bgColor, textColor, text) = when (status) {
+        "SUCCESS" -> Triple(
+            Color(0xFF00E676).copy(alpha = 0.12f),
+            Color(0xFF00E676),
+            if (durationMs >= 0) "${durationMs}ms" else "OK"
+        )
+        "TIMEOUT" -> Triple(
+            Color(0xFFFF9100).copy(alpha = 0.15f),
+            Color(0xFFFF9100),
+            "TIMEOUT"
+        )
+        else -> Triple(
+            Color(0xFFFF5252).copy(alpha = 0.15f),
+            Color(0xFFFF5252),
+            "ERR"
+        )
+    }
+
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = textColor,
+        fontWeight = FontWeight.Medium,
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(bgColor)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
+}
+

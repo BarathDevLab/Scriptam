@@ -34,4 +34,8 @@ interface ScriptDao {
 
     @Query("UPDATE scripts SET lastModified = :timestamp WHERE id = :id")
     suspend fun touchLastModified(id: Long, timestamp: Long = System.currentTimeMillis())
+
+    @Query("UPDATE scripts SET lastRunStatus = :status, lastRunDurationMs = :durationMs, lastModified = :timestamp WHERE id = :id")
+    suspend fun updateRunStatus(id: Long, status: String, durationMs: Long, timestamp: Long = System.currentTimeMillis())
 }
+

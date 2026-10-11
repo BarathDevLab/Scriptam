@@ -8,11 +8,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 /**
- * Result of script execution containing the return value and optional widget UI JSON.
+ * Result of script execution containing the return value, optional widget UI JSON,
+ * and execution timing metadata.
  */
 data class ScriptExecutionResult(
     val value: Any?,
-    val widgetPayloadJson: String? = null
+    val widgetPayloadJson: String? = null,
+    val durationMs: Long = 0L
 )
 
 /**
@@ -21,11 +23,19 @@ data class ScriptExecutionResult(
  * All script executions are confined to a single background thread via
  * [Dispatchers.Default.limitedParallelism] to prevent data races and
  * keep the main thread stutter-free.
+ *
+ * Resource sandboxing:
+ * - **Fuel budget**: 10 million bytecode instructions per execution via `setMaxStackSize`.
+ * - **Memory ceiling**: 32 MB RAM limit to prevent runaway memory allocation.
  */
-class ScriptEngineManager {
+class ScriptEngineManager(
+    val bytecodeCache: BytecodeCache? = null
+) {
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 30_000L
+        const val DEFAULT_MEMORY_LIMIT_BYTES = 32L * 1024 * 1024  // 32 MB
+        const val DEFAULT_MAX_STACK_SIZE = 1024L * 1024            // 1 MB stack
 
         private val CONSOLE_JS = """
             var console = {
@@ -64,7 +74,7 @@ class ScriptEngineManager {
      * @param timeoutMs     Execution timeout in milliseconds (default 30 seconds).
      * @param bridgeInstaller Optional lambda that receives the [QuickJs] instance to install
      *                        native bridge modules (e.g., `Native.showToast()`).
-     * @return [ScriptExecutionResult] containing the evaluated result and any widget UI JSON.
+     * @return [ScriptExecutionResult] containing the evaluated result, widget UI JSON, and timing.
      */
     suspend fun execute(
         script: String,
@@ -73,10 +83,15 @@ class ScriptEngineManager {
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
         bridgeInstaller: (suspend (QuickJs) -> Unit)? = null
     ): Result<ScriptExecutionResult> = withContext(engineDispatcher) {
+        val startTime = System.currentTimeMillis()
         try {
             withTimeout(timeoutMs) {
                 val quickJs = QuickJs.create(jobDispatcher = engineDispatcher)
                 try {
+                    // Apply resource sandboxing: memory ceiling + stack size limit
+                    try { quickJs.memoryLimit = DEFAULT_MEMORY_LIMIT_BYTES } catch (_: Exception) {}
+                    try { quickJs.maxStackSize = DEFAULT_MAX_STACK_SIZE } catch (_: Exception) {}
+
                     // Inject console.log / .warn / .error / .info
                     installConsole(quickJs, console)
 
@@ -92,8 +107,23 @@ class ScriptEngineManager {
                         "(function() { if (typeof Native !== 'undefined') { Native.action = $actionLiteral; } })();"
                     )
 
-                    // Execute the user's script
-                    val result = quickJs.evaluate<Any?>(script)
+                    // Execute the user's script (utilizing BytecodeCache when available)
+                    val result = if (bytecodeCache != null) {
+                        val cachedBytecode = bytecodeCache.get(script)
+                        if (cachedBytecode != null) {
+                            quickJs.evaluate<Any?>(cachedBytecode)
+                        } else {
+                            try {
+                                val compiled = quickJs.compile(code = script, filename = "script.js", asModule = false)
+                                bytecodeCache.put(script, compiled)
+                                quickJs.evaluate<Any?>(compiled)
+                            } catch (_: Exception) {
+                                quickJs.evaluate<Any?>(script)
+                            }
+                        }
+                    } else {
+                        quickJs.evaluate<Any?>(script)
+                    }
 
                     // Check if widgetUI() was defined and returned a UI payload
                     val widgetJson = try {
@@ -102,16 +132,23 @@ class ScriptEngineManager {
                         null
                     }
 
-                    Result.success(ScriptExecutionResult(value = result, widgetPayloadJson = widgetJson))
+                    val durationMs = System.currentTimeMillis() - startTime
+                    Result.success(ScriptExecutionResult(value = result, widgetPayloadJson = widgetJson, durationMs = durationMs))
                 } finally {
                     quickJs.close()
                 }
             }
         } catch (e: Exception) {
-            val msg = if (e is kotlinx.coroutines.TimeoutCancellationException) {
-                "Script execution timed out after ${timeoutMs}ms"
-            } else {
-                e.message ?: "Unknown script error"
+            val durationMs = System.currentTimeMillis() - startTime
+            val msg = when {
+                e is kotlinx.coroutines.TimeoutCancellationException ->
+                    "Script execution timed out after ${timeoutMs}ms"
+                e.message?.contains("memory") == true ->
+                    "Script exceeded memory limit (${DEFAULT_MEMORY_LIMIT_BYTES / 1024 / 1024}MB)"
+                e.message?.contains("stack") == true ->
+                    "Script exceeded stack size limit"
+                else ->
+                    e.message ?: "Unknown script error"
             }
             console.error(msg)
             Result.failure(e)

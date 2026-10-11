@@ -102,10 +102,47 @@
         .cm-s-material-darker .cm-property  { color: #FFCB6B !important; }
         .cm-s-material-darker .cm-operator  { color: #89DDFF !important; }
         .cm-s-material-darker .cm-atom      { color: #F78C6C !important; }
+
+        /* Autocomplete dropdown popup */
+        #autocomplete-popup {
+            display: none;
+            position: absolute;
+            z-index: 2000;
+            background: #181824;
+            border: 1px solid rgba(108, 99, 255, 0.4);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+            max-height: 180px;
+            overflow-y: auto;
+            min-width: 200px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+        .autocomplete-item:hover {
+            background: rgba(108, 99, 255, 0.25);
+        }
+        .autocomplete-label {
+            color: #EEFFFF;
+            font-weight: 500;
+        }
+        .autocomplete-detail {
+            color: #8E8E93;
+            font-size: 11px;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
     <textarea id="code"></textarea>
+    <div id="autocomplete-popup"></div>
 
     <script src="codemirror.min.js"></script>
     <script src="javascript.min.js"></script>
@@ -282,8 +319,130 @@
             focusEditor();
         });
 
+        /** Insert character or symbol at cursor. */
+        function insertText(text) {
+            if (!editor) return;
+            editor.focus();
+            var doc = editor.getDoc();
+            var cursor = doc.getCursor();
+            if (text === 'Tab') {
+                doc.replaceSelection('  ', 'end');
+            } else if (text === '{}') {
+                doc.replaceRange('{\n  \n}', cursor);
+                doc.setCursor({line: cursor.line + 1, ch: 2});
+            } else if (text === '()') {
+                doc.replaceRange('()', cursor);
+                doc.setCursor({line: cursor.line, ch: cursor.ch + 1});
+            } else if (text === '[]') {
+                doc.replaceRange('[]', cursor);
+                doc.setCursor({line: cursor.line, ch: cursor.ch + 1});
+            } else {
+                doc.replaceSelection(text, 'end');
+            }
+        }
+
+        /** Trigger editor undo. */
+        function editorUndo() {
+            if (editor) {
+                editor.focus();
+                editor.undo();
+            }
+        }
+
+        /** Trigger editor redo. */
+        function editorRedo() {
+            if (editor) {
+                editor.focus();
+                editor.redo();
+            }
+        }
+
+        /** Insert code snippet at current selection. */
+        function insertSnippetBase64(b64) {
+            if (!editor) return;
+            try {
+                var snippet = b64ToUtf8(b64);
+                editor.focus();
+                var doc = editor.getDoc();
+                doc.replaceSelection(snippet, 'end');
+            } catch (e) {
+                console.error("Scriptam: Error inserting snippet: " + e);
+            }
+        }
+
+        /* --- Trie Autocomplete UI Controller --- */
+        var acPopup = document.getElementById('autocomplete-popup');
+        var acToken = null;
+
+        function hideAutocomplete() {
+            if (acPopup) acPopup.style.display = 'none';
+            acToken = null;
+        }
+
+        function triggerAutocomplete() {
+            if (!editor || !acPopup || !window.ScriptamBridge || !window.ScriptamBridge.getCompletions) return;
+            var doc = editor.getDoc();
+            var cursor = doc.getCursor();
+            var line = doc.getLine(cursor.line);
+            var before = line.slice(0, cursor.ch);
+            var match = before.match(/([a-zA-Z0-9_$.]+)$/);
+            if (!match || match[1].length < 2) {
+                hideAutocomplete();
+                return;
+            }
+            var word = match[1];
+            var startCh = cursor.ch - word.length;
+            acToken = { line: cursor.line, from: startCh, to: cursor.ch };
+
+            try {
+                var json = window.ScriptamBridge.getCompletions(word);
+                var items = JSON.parse(json || "[]");
+                if (!items || items.length === 0) {
+                    hideAutocomplete();
+                    return;
+                }
+                acPopup.innerHTML = '';
+                items.forEach(function(item) {
+                    var div = document.createElement('div');
+                    div.className = 'autocomplete-item';
+                    div.innerHTML = '<span class="autocomplete-label">' + item.label + '</span>' +
+                                    '<span class="autocomplete-detail">' + (item.detail || '') + '</span>';
+                    div.onmousedown = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var curCursor = doc.getCursor();
+                        doc.replaceRange(item.insertText, {line: acToken.line, ch: acToken.from}, {line: curCursor.line, ch: curCursor.ch});
+                        hideAutocomplete();
+                        editor.focus();
+                    };
+                    acPopup.appendChild(div);
+                });
+                var coords = editor.cursorCoords(true, 'page');
+                acPopup.style.left = Math.max(10, Math.min(coords.left, window.innerWidth - 220)) + 'px';
+                acPopup.style.top = (coords.bottom + 6) + 'px';
+                acPopup.style.display = 'block';
+            } catch (err) {
+                console.error("Scriptam: Autocomplete error: " + err);
+                hideAutocomplete();
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            if (acPopup && !acPopup.contains(e.target)) {
+                hideAutocomplete();
+            }
+        });
+
         // Initialize immediately
         initEditor();
+        if (editor) {
+            editor.on('inputRead', function(cm, change) {
+                triggerAutocomplete();
+            });
+            editor.on('cursorActivity', function() {
+                // If cursor moves far, dismiss
+            });
+        }
     </script>
 </body>
 </html>

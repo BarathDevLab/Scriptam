@@ -70,4 +70,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             repository.renameScript(script.id, newTitle)
         }
     }
+
+    fun exportScript(context: android.content.Context, script: ScriptEntity, uri: android.net.Uri) {
+        viewModelScope.launch {
+            val code = repository.readScriptContent(script.fileName)
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                com.scriptam.app.data.bundle.ScriptBundler.exportScript(script, code, outputStream)
+            }
+        }
+    }
+
+    fun importScript(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val bundle = com.scriptam.app.data.bundle.ScriptBundler.importScript(inputStream)
+                    val newScript = repository.createScript(title = bundle.title, accentColor = bundle.accentColor)
+                    repository.saveScriptContent(newScript.id, newScript.fileName, bundle.code)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 }

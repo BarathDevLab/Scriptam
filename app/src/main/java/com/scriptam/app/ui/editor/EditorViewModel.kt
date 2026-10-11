@@ -104,10 +104,30 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     if (res.widgetPayloadJson != null) {
                         console.info("Widget UI defined.")
                     }
-                    console.info("Script finished.")
+                    console.info("Script finished in ${res.durationMs}ms.")
+                    _script.value?.let { s ->
+                        repository.updateRunStatus(s.id, "SUCCESS", res.durationMs)
+                        com.scriptam.app.widget.monitor.ExecutionLogStore.record(
+                            scriptId = s.id,
+                            scriptTitle = s.title,
+                            status = "SUCCESS",
+                            durationMs = res.durationMs
+                        )
+                    }
                 },
                 onFailure = { error ->
                     console.error("Script failed: ${error.message}")
+                    _script.value?.let { s ->
+                        val status = if (error is kotlinx.coroutines.TimeoutCancellationException) "TIMEOUT" else "ERROR"
+                        repository.updateRunStatus(s.id, status, 0L)
+                        com.scriptam.app.widget.monitor.ExecutionLogStore.record(
+                            scriptId = s.id,
+                            scriptTitle = s.title,
+                            status = status,
+                            durationMs = 0L,
+                            error = error.message
+                        )
+                    }
                 }
             )
 

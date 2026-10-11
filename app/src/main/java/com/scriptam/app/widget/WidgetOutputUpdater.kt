@@ -32,6 +32,14 @@ object WidgetOutputUpdater {
             allWidgetIds.filter { WidgetPrefs.getScriptId(context, it) == scriptId }
         }
 
+        if (isWidgetUI) {
+            com.scriptam.app.widget.monitor.WidgetStateHistory.recordSnapshot(
+                widgetId = targetIds.firstOrNull() ?: 0,
+                scriptId = scriptId,
+                payloadJson = output
+            )
+        }
+
         for (widgetId in targetIds) {
             ScriptWidget.updateWidgetOutput(
                 context = context,

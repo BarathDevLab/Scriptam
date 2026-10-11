@@ -2,6 +2,7 @@ package com.scriptam.app.bridge
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.function
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -17,10 +18,13 @@ import java.util.concurrent.TimeUnit
  * Returns the response body as a string, or an error JSON on failure.
  */
 class NetworkModule(
-    private val client: OkHttpClient = sharedClient
+    private val client: OkHttpClient = sharedClient,
+    private val rateLimiter: RateLimiter = sharedRateLimiter
 ) {
 
     companion object {
+        val sharedRateLimiter = RateLimiter(maxTokens = 15, refillRatePerSecond = 5.0)
+
         val sharedClient: OkHttpClient by lazy {
             OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
@@ -34,6 +38,14 @@ class NetworkModule(
             val url = args.firstOrNull()?.toString()
             if (url.isNullOrBlank()) {
                 return@function "{\"error\": \"fetch() requires a URL argument\"}"
+            }
+
+            val host = try {
+                url.toHttpUrlOrNull()?.host ?: "global"
+            } catch (_: Exception) { "global" }
+
+            if (!rateLimiter.tryAcquire(host)) {
+                return@function "{\"error\": \"Rate limit exceeded (HTTP 429). Throttled requests to $host\"}"
             }
 
             try {

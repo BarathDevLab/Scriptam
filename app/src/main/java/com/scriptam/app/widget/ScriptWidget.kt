@@ -78,8 +78,10 @@ class ScriptWidget : AppWidgetProvider() {
 
         private val widgetTimestampFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
+        private val lastPayloadCache = java.util.concurrent.ConcurrentHashMap<Int, WidgetPayload>()
+
         /**
-         * Rebuild and push a widget update.
+         * Rebuild and push a widget update using surgical tree-diffing when possible.
          */
         fun refreshWidget(
             context: Context,
@@ -92,8 +94,31 @@ class ScriptWidget : AppWidgetProvider() {
             val resolvedOutput = output ?: WidgetPrefs.getOutput(context, widgetId)
             val resolvedTime = timestamp ?: WidgetPrefs.getLastRun(context, widgetId)
             val resolvedIsUI = isWidgetUI ?: WidgetPrefs.isWidgetUI(context, widgetId)
-            val views = buildViews(context, widgetId, resolvedOutput, resolvedTime, resolvedIsUI)
-            appWidgetManager.updateAppWidget(widgetId, views)
+
+            if (resolvedIsUI && !resolvedOutput.isNullOrBlank()) {
+                val newPayload = WidgetPayloadParser.parse(resolvedOutput)
+                val oldPayload = lastPayloadCache[widgetId]
+                val diff = com.scriptam.app.widget.diff.WidgetTreeDiffer.diff(oldPayload, newPayload)
+                lastPayloadCache[widgetId] = newPayload
+
+                val views = buildViews(context, widgetId, resolvedOutput, resolvedTime, resolvedIsUI)
+                if (oldPayload != null && diff.hasChanges) {
+                    val surgicalSuccess = com.scriptam.app.widget.diff.WidgetTreeDiffer.applySurgicalUpdate(
+                        views, diff, oldPayload, newPayload
+                    )
+                    if (surgicalSuccess) {
+                        try {
+                            appWidgetManager.partiallyUpdateAppWidget(widgetId, views)
+                            return
+                        } catch (_: Exception) {}
+                    }
+                }
+                appWidgetManager.updateAppWidget(widgetId, views)
+            } else {
+                lastPayloadCache.remove(widgetId)
+                val views = buildViews(context, widgetId, resolvedOutput, resolvedTime, resolvedIsUI)
+                appWidgetManager.updateAppWidget(widgetId, views)
+            }
         }
 
         /** Update stored output and refresh the widget UI. */

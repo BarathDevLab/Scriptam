@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ScriptEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ScriptamDatabase : RoomDatabase() {
@@ -32,3 +32,4 @@ abstract class ScriptamDatabase : RoomDatabase() {
         }
     }
 }
+

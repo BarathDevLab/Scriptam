@@ -16,6 +16,28 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
+class EditorController {
+    internal var webView: WebView? = null
+
+    fun insertText(text: String) {
+        val escaped = org.json.JSONObject.quote(text)
+        webView?.evaluateJavascript("insertText($escaped)", null)
+    }
+
+    fun undo() {
+        webView?.evaluateJavascript("editorUndo()", null)
+    }
+
+    fun redo() {
+        webView?.evaluateJavascript("editorRedo()", null)
+    }
+
+    fun insertSnippet(snippet: String) {
+        val b64 = Base64.encodeToString(snippet.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        webView?.evaluateJavascript("insertSnippetBase64('$b64')", null)
+    }
+}
+
 /**
  * Compose wrapper around a WebView hosting CodeMirror for rich code editing.
  *
@@ -26,6 +48,7 @@ import androidx.compose.ui.viewinterop.AndroidView
  * @param initialCode  Code to load when the editor page finishes loading.
  * @param onCodeChange Called (debounced 200ms) when the user edits code in the editor.
  * @param isReadOnly   When true, the editor dims and disables input (e.g., during execution).
+ * @param controller   External controller for triggering symbols, undo, and snippets.
  */
 @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
@@ -33,6 +56,7 @@ fun WebViewEditor(
     initialCode: String,
     onCodeChange: (String) -> Unit,
     isReadOnly: Boolean = false,
+    controller: EditorController? = null,
     modifier: Modifier = Modifier
 ) {
     val currentInitialCode by rememberUpdatedState(initialCode)
@@ -41,6 +65,7 @@ fun WebViewEditor(
     AndroidView(
         factory = { context ->
             WebView(context).apply {
+                controller?.webView = this
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -104,12 +129,16 @@ fun WebViewEditor(
             }
         },
         update = { webView ->
+            controller?.webView = webView
             webView.evaluateJavascript(
                 "if (typeof setReadOnly === 'function') { setReadOnly($isReadOnly); }", null
             )
         },
         modifier = modifier,
-        onRelease = { it.destroy() }
+        onRelease = {
+            controller?.webView = null
+            it.destroy()
+        }
     )
 }
 
@@ -148,5 +177,21 @@ private class EditorJsBridge(
             val imm = webView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(webView, InputMethodManager.SHOW_IMPLICIT)
         }
+    }
+
+    private val trie = com.scriptam.app.core.autocomplete.TrieAutocomplete()
+
+    @JavascriptInterface
+    fun getCompletions(prefix: String): String {
+        val matches = trie.findCompletions(prefix)
+        val array = org.json.JSONArray()
+        for (m in matches) {
+            val obj = org.json.JSONObject()
+            obj.put("label", m.label)
+            obj.put("detail", m.detail)
+            obj.put("insertText", m.insertText)
+            array.put(obj)
+        }
+        return array.toString()
     }
 }

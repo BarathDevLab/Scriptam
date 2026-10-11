@@ -10,15 +10,21 @@ class ScriptamApp : Application() {
     lateinit var scriptEngineManager: com.scriptam.app.core.ScriptEngineManager
         private set
 
+    lateinit var bytecodeCache: com.scriptam.app.core.BytecodeCache
+        private set
+
     override fun onCreate() {
         super.onCreate()
 
         val database = com.scriptam.app.data.db.ScriptamDatabase.getInstance(this)
         val fileManager = com.scriptam.app.data.file.ScriptFileManager(this)
+        bytecodeCache = com.scriptam.app.core.BytecodeCache(this)
         scriptRepository = com.scriptam.app.data.repository.ScriptRepository(
             scriptDao = database.scriptDao(),
             fileManager = fileManager
         )
-        scriptEngineManager = com.scriptam.app.core.ScriptEngineManager()
+        scriptEngineManager = com.scriptam.app.core.ScriptEngineManager(
+            bytecodeCache = bytecodeCache
+        )
     }
 }

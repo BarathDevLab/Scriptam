@@ -80,6 +80,28 @@ class ScriptWorker(
             )
         }
 
+        val res = result.getOrNull()
+        if (result.isSuccess && res != null) {
+            repository.updateRunStatus(scriptId, "SUCCESS", res.durationMs)
+            com.scriptam.app.widget.monitor.ExecutionLogStore.record(
+                scriptId = scriptId,
+                scriptTitle = script.title,
+                status = "SUCCESS",
+                durationMs = res.durationMs
+            )
+        } else {
+            val isTimeout = result.exceptionOrNull() is kotlinx.coroutines.TimeoutCancellationException
+            val status = if (isTimeout) "TIMEOUT" else "ERROR"
+            repository.updateRunStatus(scriptId, status, 0L)
+            com.scriptam.app.widget.monitor.ExecutionLogStore.record(
+                scriptId = scriptId,
+                scriptTitle = script.title,
+                status = status,
+                durationMs = 0L,
+                error = result.exceptionOrNull()?.message
+            )
+        }
+
         return if (result.isSuccess) Result.success() else Result.retry()
     }
 

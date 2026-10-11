@@ -60,4 +60,10 @@ class ScriptRepository(
     }
 
     suspend fun getScriptById(id: Long): ScriptEntity? = scriptDao.getById(id)
+
+    /** Update run telemetry after script execution. */
+    suspend fun updateRunStatus(id: Long, status: String, durationMs: Long) {
+        scriptDao.updateRunStatus(id, status, durationMs)
+    }
 }
+

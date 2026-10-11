@@ -12,6 +12,7 @@ class AndroidBridge(
     private val uiModule: UIModule,
     private val storageModule: StorageModule,
     private val networkModule: NetworkModule,
+    private val secretsModule: SecretsModule = SecretsModule(context),
     private val clipboardModule: ClipboardModule = ClipboardModule(context),
     private val notificationModule: NotificationModule = NotificationModule(context),
     private val deviceInfoModule: DeviceInfoModule = DeviceInfoModule(context)
@@ -19,24 +20,12 @@ class AndroidBridge(
 
     /**
      * Installs all native API modules into the given [QuickJs] context.
-     * After calling this, JavaScript code can use:
-     *
-     * ```js
-     * Native.showToast("Hello");
-     * Native.alert("Title", "Message");
-     * Native.storage.get("key");
-     * Native.storage.set("key", "value");
-     * Native.clipboard.copy("text");
-     * Native.clipboard.paste();
-     * Native.notify("Title", "Body");
-     * Native.device();            // returns JSON string
-     * var response = Native.fetch("https://api.example.com/data");
-     * ```
      */
     suspend fun install(quickJs: QuickJs) {
         uiModule.install(quickJs)
         storageModule.install(quickJs)
         networkModule.install(quickJs)
+        secretsModule.install(quickJs)
         clipboardModule.install(quickJs)
         notificationModule.install(quickJs)
         deviceInfoModule.install(quickJs)
@@ -52,6 +41,13 @@ class AndroidBridge(
                     set:    __native_storage_set,
                     remove: __native_storage_remove
                 },
+                secrets: {
+                    get:    __native_secret_get,
+                    set:    __native_secret_set,
+                    remove: __native_secret_remove
+                },
+                getSecret:  __native_secret_get,
+                setSecret:  __native_secret_set,
                 clipboard: {
                     copy:   __native_clipboard_copy,
                     paste:  __native_clipboard_paste
@@ -71,7 +67,8 @@ class AndroidBridge(
                 context = appCtx,
                 uiModule = UIModule(appCtx),
                 storageModule = StorageModule(appCtx),
-                networkModule = NetworkModule()
+                networkModule = NetworkModule(),
+                secretsModule = SecretsModule(appCtx)
             )
         }
     }

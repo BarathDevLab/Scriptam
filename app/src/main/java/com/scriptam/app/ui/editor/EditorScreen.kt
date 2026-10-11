@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Terminal
@@ -50,6 +52,8 @@ import com.scriptam.app.ui.runner.RunnerPopup
 fun EditorScreen(
     scriptId: Long,
     onNavigateBack: () -> Unit,
+    onOpenSimulator: () -> Unit = {},
+    onOpenWatcher: () -> Unit = {},
     viewModel: EditorViewModel = viewModel()
 ) {
     val script by viewModel.script.collectAsState()
@@ -60,6 +64,8 @@ fun EditorScreen(
 
     // Interactive runner popup state
     var showRunnerPopup by remember { mutableStateOf(false) }
+    var showSnippetSheet by remember { mutableStateOf(false) }
+    val editorController = remember { EditorController() }
 
     LaunchedEffect(scriptId) {
         viewModel.loadScript(scriptId)
@@ -99,6 +105,30 @@ fun EditorScreen(
                             Icons.Default.Save,
                             contentDescription = "Save",
                             tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+
+                    // Widget Live Simulator button
+                    IconButton(onClick = {
+                        viewModel.saveCode()
+                        onOpenSimulator()
+                    }) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = "Widget Simulator",
+                            tint = Color(0xFF6C63FF)
+                        )
+                    }
+
+                    // Watcher Suite button
+                    IconButton(onClick = {
+                        viewModel.saveCode()
+                        onOpenWatcher()
+                    }) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Watcher Suite",
+                            tint = Color(0xFF00E5FF)
                         )
                     }
 
@@ -145,7 +175,7 @@ fun EditorScreen(
                         Icon(
                             imageVector = Icons.Default.Visibility,
                             contentDescription = "Run (Interactive)",
-                            tint = Color(0xFF6C63FF)
+                            tint = Color(0xFF00E5FF)
                         )
                     }
                 },
@@ -173,6 +203,7 @@ fun EditorScreen(
                             initialCode = code,
                             onCodeChange = { viewModel.onCodeChange(it) },
                             isReadOnly = isRunning,
+                            controller = editorController,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -192,6 +223,16 @@ fun EditorScreen(
                 }
             }
 
+            // Keyboard accessory bar
+            if (script != null && !isRunning) {
+                EditorAccessoryBar(
+                    onInsertText = { editorController.insertText(it) },
+                    onUndo = { editorController.undo() },
+                    onRedo = { editorController.redo() },
+                    onOpenSnippets = { showSnippetSheet = true }
+                )
+            }
+
             // Console drawer with slide animation
             AnimatedVisibility(
                 visible = showConsole,
@@ -206,6 +247,16 @@ fun EditorScreen(
                 )
             }
         }
+    }
+
+    // Snippet insertion modal sheet
+    if (showSnippetSheet) {
+        SnippetSheet(
+            onDismiss = { showSnippetSheet = false },
+            onSelectSnippet = { snippetCode ->
+                editorController.insertSnippet(snippetCode)
+            }
+        )
     }
 
     // Interactive runner popup overlay
